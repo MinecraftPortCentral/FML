@@ -334,10 +334,11 @@ public class MCPMerger
         return ann;
     }
 
+    @SuppressWarnings("unchecked")
     private static Hashtable<String, ZipEntry> getClassEntries(ZipFile inFile, ZipOutputStream outFile) throws IOException
     {
         Hashtable<String, ZipEntry> ret = new Hashtable<String, ZipEntry>();
-        for (ZipEntry entry : Collections.list(inFile.entries()))
+        for (ZipEntry entry : Collections.list((Enumeration<ZipEntry>)inFile.entries()))
         {
             if (entry.isDirectory())
             {
@@ -422,6 +423,7 @@ public class MCPMerger
         return classNode;
     }
 
+    @SuppressWarnings("unchecked")
     private static void processFields(ClassNode cClass, ClassNode sClass, ClassInfo info)
     {
         List<FieldNode> cFields = cClass.fields;
@@ -535,6 +537,7 @@ public class MCPMerger
             return Objects.toStringHelper(this).add("name", node.name).add("desc",node.desc).add("server",server).add("client",client).toString();
         }
     }
+    @SuppressWarnings("unchecked")
     private static void processMethods(ClassNode cClass, ClassNode sClass, ClassInfo info)
     {
         List<MethodNode> cMethods = (List<MethodNode>)cClass.methods;
