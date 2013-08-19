@@ -45,12 +45,14 @@ import cpw.mods.fml.relauncher.IFMLLoadingPlugin.TransformerExclusions;
 
 public class CoreModManager
 {
+    private static final Attributes.Name COREMODCONTAINSFMLMOD = new Attributes.Name("FMLCorePluginContainsFMLMod");
     private static String[] rootPlugins =  { "cpw.mods.fml.relauncher.FMLCorePlugin" , "net.minecraftforge.classloading.FMLForgePlugin" };
-    private static List<String> loadedCoremods = new ArrayList<String>();
+    private static List<String> loadedCoremods = Lists.newArrayList();
     private static List<FMLPluginWrapper> loadPlugins;
     private static boolean deobfuscatedEnvironment;
     private static FMLTweaker tweaker;
     private static File mcDir;
+    private static List<String> reparsedCoremods = Lists.newArrayList();
 
     private static class FMLPluginWrapper
     {
@@ -160,7 +162,7 @@ public class CoreModManager
         for (File coreMod : coreModList)
         {
             FMLRelaunchLog.fine("Examining for coremod candidacy %s", coreMod.getName());
-            JarFile jar;
+            JarFile jar = null;
             Attributes mfAttributes;
             try
             {
@@ -177,10 +179,24 @@ public class CoreModManager
                 FMLRelaunchLog.log(Level.SEVERE, ioe, "Unable to read the jar file %s - ignoring", coreMod.getName());
                 continue;
             }
-
+            finally
+            {
+                if (jar!=null)
+                {
+                    try
+                    {
+                        jar.close();
+                    }
+                    catch (IOException e)
+                    {
+                        // Noise
+                    }
+                }
+            }
             String cascadedTweaker = mfAttributes.getValue("TweakClass");
             if (cascadedTweaker != null)
             {
+                FMLRelaunchLog.info("Loading tweaker %s from %s", cascadedTweaker, coreMod.getName());
                 handleCascadingTweak(coreMod, jar, cascadedTweaker, classLoader);
                 loadedCoremods.add(coreMod.getName());
                 continue;
@@ -190,13 +206,23 @@ public class CoreModManager
             if (fmlCorePlugin == null)
             {
                 // Not a coremod
+                FMLRelaunchLog.fine("Not found coremod data in %s", coreMod.getName());
                 continue;
             }
 
             try
             {
                 classLoader.addURL(coreMod.toURI().toURL());
-                loadedCoremods.add(coreMod.getName());
+                if (!mfAttributes.containsKey(COREMODCONTAINSFMLMOD))
+                {
+                    FMLRelaunchLog.finest("Adding %s to the list of known coremods, it will not be examined again", coreMod.getName());
+                    loadedCoremods.add(coreMod.getName());
+                }
+                else
+                {
+                    FMLRelaunchLog.finest("Found FMLCorePluginContainsFMLMod marker in %s, it will be examined later for regular @Mod instances", coreMod.getName());
+                    reparsedCoremods.add(coreMod.getName());
+                }
             }
             catch (MalformedURLException e)
             {
@@ -214,7 +240,7 @@ public class CoreModManager
             classLoader.addURL(coreMod.toURI().toURL());
             Class<? extends ITweaker> newTweakClass = (Class<? extends ITweaker>) Class.forName(cascadedTweaker, true, classLoader);
             ITweaker newTweak = newTweakClass.newInstance();
-            CoreModManager.tweaker.injectCascadingTweak(tweaker);
+            CoreModManager.tweaker.injectCascadingTweak(newTweak);
         }
         catch (Exception e)
         {
@@ -253,6 +279,11 @@ public class CoreModManager
         return loadedCoremods;
     }
 
+    public static List<String> getReparseableCoremods()
+    {
+        return reparsedCoremods;
+    }
+    
     private static FMLPluginWrapper loadCoreMod(LaunchClassLoader classLoader, String coreModClass, File location)
     {
         String coreModName = coreModClass.substring(coreModClass.lastIndexOf('.')+1);
