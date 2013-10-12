@@ -39,6 +39,7 @@ import net.minecraft.crash.CrashReport;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.launchwrapper.Launch;
 import net.minecraft.network.INetworkManager;
 import net.minecraft.network.packet.NetHandler;
 import net.minecraft.network.packet.Packet;
@@ -49,6 +50,7 @@ import net.minecraft.world.World;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.MapDifference.ValueDifference;
 import com.google.common.collect.Maps;
@@ -206,6 +208,22 @@ public class FMLClientHandler implements IFMLSidedHandler
             haltGame("There was a severe problem during mod loading that has caused the game to fail", le);
             return;
         }
+
+        Map<String,Map<String,String>> sharedModList = (Map<String, Map<String, String>>) Launch.blackboard.get("modList");
+        if (sharedModList == null)
+        {
+            sharedModList = Maps.newHashMap();
+            Launch.blackboard.put("modList", sharedModList);
+        }
+        for (ModContainer mc : Loader.instance().getActiveModList())
+        {
+            Map<String,String> sharedModDescriptor = mc.getSharedModDescriptor();
+            if (sharedModDescriptor != null)
+            {
+                String sharedModId = "fml:"+mc.getModId();
+                sharedModList.put(sharedModId, sharedModDescriptor);
+            }
+        }
     }
 
     @Override
@@ -241,6 +259,8 @@ public class FMLClientHandler implements IFMLSidedHandler
             haltGame("There was a severe problem during mod loading that has caused the game to fail", le);
             return;
         }
+        
+        client.field_71416_A.LOAD_SOUND_SYSTEM = true;
         // Reload resources
         client.func_110436_a();
         RenderingRegistry.instance().loadEntityRenderers((Map<Class<? extends Entity>, Render>)RenderManager.field_78727_a.field_78729_o);
@@ -249,6 +269,31 @@ public class FMLClientHandler implements IFMLSidedHandler
         KeyBindingRegistry.instance().uploadKeyBindingsToGame(client.field_71474_y);
     }
 
+    public void extendModList()
+    {
+        Map<String,Map<String,String>> modList = (Map<String, Map<String, String>>) Launch.blackboard.get("modList");
+        if (modList != null)
+        {
+            for (Entry<String, Map<String, String>> modEntry : modList.entrySet())
+            {
+                String sharedModId = modEntry.getKey();
+                String system = sharedModId.split(":")[0];
+                if ("fml".equals(system))
+                {
+                    continue;
+                }
+                Map<String, String> mod = modEntry.getValue();
+                String modSystem = mod.get("modsystem"); // the modsystem (FML uses FML or ModLoader)
+                String modId = mod.get("id"); // unique ID
+                String modVersion = mod.get("version"); // version
+                String modName = mod.get("name"); // a human readable name
+                String modURL = mod.get("url"); // a URL for the mod (can be empty string)
+                String modAuthors = mod.get("authors"); // a csv of authors (can be empty string)
+                String modDescription = mod.get("description"); // a (potentially) multiline description (can be empty string)
+            }
+        }
+
+    }
     public void onInitializationComplete()
     {
         if (wrongMC != null)
@@ -611,5 +656,17 @@ public class FMLClientHandler implements IFMLSidedHandler
     public String getCurrentLanguage()
     {
         return client.func_135016_M().func_135041_c().func_135034_a();
+    }
+
+    @Override
+    public void serverStopped()
+    {
+        // If the server crashes during startup, it might hang the client- reset the client so it can abend properly.
+        MinecraftServer server = getServer();
+
+        if (server != null && !server.func_71200_ad())
+        {
+            ObfuscationReflectionHelper.setPrivateValue(MinecraftServer.class, server, true, "field_71296"+"_Q","serverIs"+"Running");
+        }
     }
 }

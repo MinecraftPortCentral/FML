@@ -24,7 +24,7 @@
         "url": "http://files.minecraftforge.net/maven/"
       },
       {
-        "name": "net.minecraft:launchwrapper:1.3",
+        "name": "net.minecraft:launchwrapper:1.8",
         "serverreq":true
       },
       {
@@ -34,7 +34,7 @@
       {
         "name": "org.scala-lang:scala-library:2.10.2",
         "url" : "http://files.minecraftforge.net/maven/",
-        "checksums" : [ "6ba65d12cd09d441083262d6f73d2257fec7c663", "dffc88e804861c9eaba39283757000b6558ea573" ],
+        "checksums" : [ "6ba65d12cd09d441083262d6f73d2257fec7c663", "65de4339eaed1c3675485fb03a3532fecfd8e8cd" ],
         "comment" : "Important for FML, we add this",
         "serverreq":true,
         "clientreq":true
@@ -42,17 +42,17 @@
       {
         "name": "org.scala-lang:scala-compiler:2.10.2",
         "url" : "http://files.minecraftforge.net/maven/",
-        "checksums" : [ "64c8b1380cc53d6850823d6e4e7ae984aa44ef9c", "40281b3ffc69fb385953522c843363ccaf71ba89" ],
+        "checksums" : [ "64c8b1380cc53d6850823d6e4e7ae984aa44ef9c", "99fd0ffb66f3088b0cd1071315fd5eb2b2b070ff" ],
         "comment" : "Important for FML, we add this",
         "serverreq":true,
         "clientreq":true
       },
       {
-        "name": "net.sf.jopt-simple:jopt-simple:4.5",
+        "name": "lzma:lzma:0.0.1",
         "serverreq":true
       },
       {
-        "name": "lzma:lzma:0.0.1",
+        "name": "net.sf.jopt-simple:jopt-simple:4.5",
         "serverreq":true
       },
       {
@@ -69,12 +69,6 @@
       },
       {
         "name": "com.paulscode:soundsystem:20120107"
-      },
-      {
-        "name": "org.lwjgl.lwjgl:lwjgl:2.9.0"
-      },
-      {
-        "name": "org.lwjgl.lwjgl:lwjgl_util:2.9.0"
       },
       {
         "name": "argo:argo:2.25_fixed"

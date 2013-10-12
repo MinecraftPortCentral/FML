@@ -149,7 +149,7 @@ public class Loader
     private File canonicalModsDir;
     private LoadController modController;
     private MinecraftDummyContainer minecraft;
-	private MCPDummyContainer mcp;
+    private MCPDummyContainer mcp;
 
     private static File minecraftDir;
     private static List<String> injectedContainers;
@@ -368,7 +368,6 @@ public class Loader
         {
             return o1.getModId().compareTo(o2.getModId());
         }
-
     }
 
     private void identifyDuplicates(List<ModContainer> mods)
@@ -394,7 +393,7 @@ public class Loader
         }
         if (!dupes.isEmpty())
         {
-        	throw new DuplicateModsFoundException(dupes);
+            throw new DuplicateModsFoundException(dupes);
         }
     }
 
@@ -505,6 +504,7 @@ public class Loader
                 }
             }
         }
+        ModAPIManager.INSTANCE.buildAPITransformer(modClassLoader, disc);
         modController.transition(LoaderState.CONSTRUCTING, false);
         modController.distributeStateMessage(LoaderState.CONSTRUCTING, modClassLoader, disc.getASMTable());
         FMLLog.fine("Mod signature data");
@@ -595,7 +595,7 @@ public class Loader
         List<String> branding = FMLCommonHandler.instance().getBrandings();
 
         Joiner.on(' ').skipNulls().appendTo(ret, branding.subList(1, branding.size()));
-        if (modController!=null)
+        if (modController != null)
         {
             modController.printModStates(ret);
         }
@@ -619,7 +619,7 @@ public class Loader
             return;
         }
 
-        boolean parseFailure=false;
+        boolean parseFailure = false;
 
         for (String dep : DEPENDENCYSPLITTER.split(dependencyString))
         {
@@ -627,7 +627,7 @@ public class Loader
             // Need two parts to the string
             if (depparts.size() != 2)
             {
-                parseFailure=true;
+                parseFailure = true;
                 continue;
             }
             String instruction = depparts.get(0);
@@ -635,7 +635,7 @@ public class Loader
             boolean targetIsAll = target.startsWith("*");
 
             // Cannot have an "all" relationship with anything except pure *
-            if (targetIsAll && target.length()>1)
+            if (targetIsAll && target.length() > 1)
             {
                 parseFailure = true;
                 continue;
@@ -651,13 +651,13 @@ public class Loader
                 }
                 else
                 {
-                    parseFailure=true;
+                    parseFailure = true;
                     continue;
                 }
             }
 
             // You cannot have a versioned dependency on everything
-            if (targetIsAll && target.indexOf('@')>-1)
+            if (targetIsAll && target.indexOf('@') > -1)
             {
                 parseFailure = true;
                 continue;
@@ -674,7 +674,7 @@ public class Loader
             }
             else
             {
-                parseFailure=true;
+                parseFailure = true;
             }
         }
 
@@ -703,7 +703,7 @@ public class Loader
         modController.distributeStateMessage(LoaderState.AVAILABLE);
         // Dump the custom registry data map, if necessary
         GameData.dumpRegistry(minecraftDir);
-        FMLLog.info("Forge Mod Loader has successfully loaded %d mod%s", mods.size(), mods.size()==1 ? "" : "s");
+        FMLLog.info("Forge Mod Loader has successfully loaded %d mod%s", mods.size(), mods.size() == 1 ? "" : "s");
     }
 
     public ICrashCallable getCallableCrashInformation()
@@ -790,13 +790,15 @@ public class Loader
         return minecraft;
     }
 
-	public boolean hasReachedState(LoaderState state) {
-		return modController != null ? modController.hasReachedState(state) : false;
-	}
+    public boolean hasReachedState(LoaderState state)
+    {
+        return modController != null ? modController.hasReachedState(state) : false;
+    }
 
-	public String getMCPVersionString() {
-		return String.format("MCP v%s", mcpversion);
-	}
+    public String getMCPVersionString()
+    {
+        return String.format("MCP v%s", mcpversion);
+    }
 
     public void serverStopped()
     {

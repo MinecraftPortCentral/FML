@@ -17,6 +17,8 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,6 +29,7 @@ import java.util.jar.JarFile;
 import java.util.logging.Level;
 
 import net.minecraft.launchwrapper.ITweaker;
+import net.minecraft.launchwrapper.Launch;
 import net.minecraft.launchwrapper.LaunchClassLoader;
 
 import com.google.common.base.Strings;
@@ -233,14 +236,20 @@ public class CoreModManager
         }
     }
 
+    private static Method ADDURL;
     private static void handleCascadingTweak(File coreMod, JarFile jar, String cascadedTweaker, LaunchClassLoader classLoader)
     {
         try
         {
+            // Have to manually stuff the tweaker into the parent classloader
+            if (ADDURL == null)
+            {
+                ADDURL = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
+                ADDURL.setAccessible(true);
+            }
+            ADDURL.invoke(classLoader.getClass().getClassLoader(), coreMod.toURI().toURL());
             classLoader.addURL(coreMod.toURI().toURL());
-            Class<? extends ITweaker> newTweakClass = (Class<? extends ITweaker>) Class.forName(cascadedTweaker, true, classLoader);
-            ITweaker newTweak = newTweakClass.newInstance();
-            CoreModManager.tweaker.injectCascadingTweak(newTweak);
+            CoreModManager.tweaker.injectCascadingTweak(cascadedTweaker);
         }
         catch (Exception e)
         {
@@ -283,7 +292,7 @@ public class CoreModManager
     {
         return reparsedCoremods;
     }
-    
+
     private static FMLPluginWrapper loadCoreMod(LaunchClassLoader classLoader, String coreModClass, File location)
     {
         String coreModName = coreModClass.substring(coreModClass.lastIndexOf('.')+1);
@@ -441,26 +450,8 @@ public class CoreModManager
                 FMLInjectionData.containers.add(modContainer);
             }
         }
-        // Deobfuscation transformer, always last
-        if (!deobfuscatedEnvironment)
-        {
-            classLoader.registerTransformer("cpw.mods.fml.common.asm.transformers.DeobfuscationTransformer");
-        }
-        try
-        {
-            FMLRelaunchLog.fine("Validating minecraft");
-            Class<?> loaderClazz = Class.forName("cpw.mods.fml.common.Loader", true, classLoader);
-            Method m = loaderClazz.getMethod("injectData", Object[].class);
-            m.invoke(null, (Object)FMLInjectionData.data());
-            m = loaderClazz.getMethod("instance");
-            m.invoke(null);
-            FMLRelaunchLog.fine("Minecraft validated, launching...");
-        }
-        catch (Exception e)
-        {
-            // Load in the Loader, make sure he's ready to roll - this will initialize most of the rest of minecraft here
-            System.out.println("A CRITICAL PROBLEM OCCURED INITIALIZING MINECRAFT - LIKELY YOU HAVE AN INCORRECT VERSION FOR THIS FML");
-            throw new RuntimeException(e);
-        }
+
+        Launch.blackboard.put("fml.deobfuscatedEnvironment", deobfuscatedEnvironment);
+        tweaker.injectCascadingTweak("cpw.mods.fml.common.launcher.FMLDeobfTweaker");
     }
 }

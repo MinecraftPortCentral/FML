@@ -3,8 +3,11 @@ package cpw.mods.fml.common.launcher;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -17,11 +20,13 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.ObjectArrays;
 
 import cpw.mods.fml.relauncher.FMLLaunchHandler;
 
 import net.minecraft.launchwrapper.ITweaker;
+import net.minecraft.launchwrapper.Launch;
 import net.minecraft.launchwrapper.LaunchClassLoader;
 
 public class FMLTweaker implements ITweaker {
@@ -29,12 +34,9 @@ public class FMLTweaker implements ITweaker {
     private File gameDir;
     private File assetsDir;
     private String profile;
+    private Map<String, String> launchArgs;
+    private List<String> standaloneArgs;
     private static URI jarLocation;
-    private String[] array;
-    private List<ITweaker> cascadedTweaks;
-    private String profileName;
-    private OptionSet parsedOptions;
-    private ArgumentAcceptingOptionSpec<String> cascadedTweaksOption;
 
     @Override
     public void acceptOptions(List<String> args, File gameDir, File assetsDir, String profile)
@@ -42,6 +44,64 @@ public class FMLTweaker implements ITweaker {
         this.gameDir = (gameDir == null ? new File(".") : gameDir);
         this.assetsDir = assetsDir;
         this.profile = profile;
+        this.args = args;
+
+        this.launchArgs = (Map<String, String>)Launch.blackboard.get("launchArgs");
+
+        this.standaloneArgs = Lists.newArrayList();
+        if (this.launchArgs == null)
+        {
+            this.launchArgs = Maps.newHashMap();
+            Launch.blackboard.put("launchArgs", this.launchArgs);
+        }
+
+        String classifier = null;
+
+        for (String arg : args)
+        {
+            if (arg.startsWith("-"))
+            {
+                if (classifier != null)
+                {
+                    classifier = launchArgs.put(classifier, "");
+                }
+                else if (arg.contains("="))
+                {
+                    classifier = launchArgs.put(arg.substring(0, arg.indexOf('=')), arg.substring(arg.indexOf('=') + 1));
+                }
+                else
+                {
+                    classifier = arg;
+                }
+            }
+            else
+            {
+                if (classifier != null)
+                {
+                    classifier = launchArgs.put(classifier, arg);
+                }
+                else
+                {
+                    this.standaloneArgs.add(arg);
+                }
+            }
+        }
+
+        if (!this.launchArgs.containsKey("--version"))
+        {
+            launchArgs.put("--version", profile != null ? profile : "UnknownFMLProfile");
+        }
+
+        if (!this.launchArgs.containsKey("--gameDir") && gameDir != null)
+        {
+            launchArgs.put("--gameDir", gameDir.getAbsolutePath());
+        }
+
+        if (!this.launchArgs.containsKey("--assetsDir") && assetsDir != null)
+        {
+            launchArgs.put("--assetsDir", assetsDir.getAbsolutePath());
+        }
+
         try
         {
             jarLocation = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
@@ -51,65 +111,17 @@ public class FMLTweaker implements ITweaker {
             Logger.getLogger("FMLTWEAK").log(Level.SEVERE, "Missing URI information for FML tweak");
             throw Throwables.propagate(e);
         }
-
-        OptionParser optionParser = new OptionParser();
-        cascadedTweaksOption = optionParser.accepts("cascadedTweaks", "Additional tweaks to be called by FML, implementing ITweaker").withRequiredArg().ofType(String.class).withValuesSeparatedBy(',');
-        ArgumentAcceptingOptionSpec<String> profileNameOption = optionParser.accepts("profileName", "A profile name, parsed by FML to control mod loading and such").withRequiredArg().ofType(String.class);
-        optionParser.allowsUnrecognizedOptions();
-        NonOptionArgumentSpec<String> nonOptions = optionParser.nonOptions();
-
-        parsedOptions = optionParser.parse(args.toArray(new String[args.size()]));
-        if (parsedOptions.has(profileNameOption))
-        {
-            profileName = profileNameOption.value(parsedOptions);
-        }
-        this.args = parsedOptions.valuesOf(nonOptions);
-        this.cascadedTweaks = Lists.newArrayList();
     }
 
     @Override
     public void injectIntoClassLoader(LaunchClassLoader classLoader)
     {
-        computeCascadedTweaks(classLoader);
         classLoader.addTransformerExclusion("cpw.mods.fml.repackage.");
         classLoader.addTransformerExclusion("cpw.mods.fml.relauncher.");
         classLoader.addTransformerExclusion("cpw.mods.fml.common.asm.transformers.");
         classLoader.addClassLoaderExclusion("LZMA.");
         FMLLaunchHandler.configureForClientLaunch(classLoader, this);
-        runAdditionalTweaks(classLoader);
         FMLLaunchHandler.appendCoreMods();
-    }
-
-    void computeCascadedTweaks(LaunchClassLoader classLoader)
-    {
-        if (parsedOptions.has(cascadedTweaksOption))
-        {
-            for (String tweaker : cascadedTweaksOption.values(parsedOptions))
-            {
-                try
-                {
-                    classLoader.addClassLoaderExclusion(tweaker.substring(0,tweaker.lastIndexOf('.')));
-                    Class<? extends ITweaker> tweakClass = (Class<? extends ITweaker>) Class.forName(tweaker,true,classLoader);
-                    ITweaker additionalTweak = tweakClass.newInstance();
-                    cascadedTweaks.add(additionalTweak);
-                }
-                catch (Exception e)
-                {
-                    Logger.getLogger("FMLTWEAK").log(Level.INFO, "Missing additional tweak class "+tweaker);
-                }
-            }
-        }
-    }
-
-    void runAdditionalTweaks(LaunchClassLoader classLoader)
-    {
-        List<String> fmlArgs = Lists.newArrayList(args);
-        fmlArgs.add("--fmlIsPresent");
-        for (ITweaker tweak : cascadedTweaks)
-        {
-            tweak.acceptOptions(fmlArgs, gameDir, assetsDir, profile);
-            tweak.injectIntoClassLoader(classLoader);
-        }
     }
 
     @Override
@@ -121,35 +133,17 @@ public class FMLTweaker implements ITweaker {
     @Override
     public String[] getLaunchArguments()
     {
-        String[] array = args.toArray(new String[args.size()]);
+        List<String> args = Lists.newArrayList();
+        args.addAll(standaloneArgs);
 
-        for (ITweaker tweak: cascadedTweaks)
+        for (Entry<String, String> arg : launchArgs.entrySet())
         {
-            array = ObjectArrays.concat(tweak.getLaunchArguments(), array, String.class);
+            args.add(arg.getKey());
+            args.add(arg.getValue());
         }
+        launchArgs.clear();
 
-        if (gameDir != null && !Arrays.asList(array).contains("--gameDir"))
-        {
-            array = ObjectArrays.concat(gameDir.getAbsolutePath(),array);
-            array = ObjectArrays.concat("--gameDir",array);
-        }
-
-        if (assetsDir != null && !Arrays.asList(array).contains("--assetsDir"))
-        {
-            array = ObjectArrays.concat(assetsDir.getAbsolutePath(),array);
-            array = ObjectArrays.concat("--assetsDir",array);
-        }
-        if (profile != null && !Arrays.asList(array).contains("--version"))
-        {
-            array = ObjectArrays.concat(profile,array);
-            array = ObjectArrays.concat("--version",array);
-        }
-        else if (!Arrays.asList(array).contains("--version"))
-        {
-            array = ObjectArrays.concat("UnknownFMLProfile",array);
-            array = ObjectArrays.concat("--version",array);
-        }
-        return array;
+        return args.toArray(new String[args.size()]);
     }
 
     public File getGameDir()
@@ -162,9 +156,10 @@ public class FMLTweaker implements ITweaker {
         return jarLocation;
     }
 
-    public void injectCascadingTweak(ITweaker tweaker)
+    public void injectCascadingTweak(String tweakClassName)
     {
-        cascadedTweaks.add(tweaker);
+        List<String> tweakClasses = (List<String>) Launch.blackboard.get("TweakClasses");
+        tweakClasses.add(tweakClassName);
     }
 
 }

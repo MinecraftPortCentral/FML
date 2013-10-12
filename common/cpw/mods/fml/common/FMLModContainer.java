@@ -43,6 +43,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
@@ -54,6 +55,7 @@ import cpw.mods.fml.common.Mod.Instance;
 import cpw.mods.fml.common.Mod.Metadata;
 import cpw.mods.fml.common.discovery.ASMDataTable;
 import cpw.mods.fml.common.discovery.ASMDataTable.ASMData;
+import cpw.mods.fml.common.discovery.ModCandidate;
 import cpw.mods.fml.common.event.FMLConstructionEvent;
 import cpw.mods.fml.common.event.FMLEvent;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -112,11 +114,13 @@ public class FMLModContainer implements ModContainer
     private ILanguageAdapter languageAdapter;
     private ListMultimap<Class<? extends FMLEvent>,Method> eventMethods;
     private Map<String, String> customModProperties;
+    private ModCandidate candidate;
 
-    public FMLModContainer(String className, File modSource, Map<String,Object> modDescriptor)
+    public FMLModContainer(String className, ModCandidate container, Map<String,Object> modDescriptor)
     {
         this.className = className;
-        this.source = modSource;
+        this.source = container.getModContainer();
+        this.candidate = container;
         this.descriptor = modDescriptor;
         this.modLanguage = (String) modDescriptor.get("modLanguage");
         this.languageAdapter = "scala".equals(modLanguage) ? new ILanguageAdapter.ScalaAdapter() : new ILanguageAdapter.JavaAdapter();
@@ -454,6 +458,7 @@ public class FMLModContainer implements ModContainer
         {
             ModClassLoader modClassLoader = event.getModClassLoader();
             modClassLoader.addFile(source);
+            modClassLoader.clearNegativeCacheFor(candidate.getClassList());
             Class<?> clazz = Class.forName(className, true, modClassLoader);
 
             Certificate[] certificates = clazz.getProtectionDomain().getCodeSource().getCertificates();
@@ -608,5 +613,18 @@ public class FMLModContainer implements ModContainer
         {
             return null;
         }
+    }
+    @Override
+    public Map<String, String> getSharedModDescriptor()
+    {
+        Map<String,String> descriptor = Maps.newHashMap();
+        descriptor.put("modsystem", "FML");
+        descriptor.put("id", getModId());
+        descriptor.put("version",getDisplayVersion());
+        descriptor.put("name", getName());
+        descriptor.put("url", modMetadata.url);
+        descriptor.put("authors", modMetadata.getAuthorList());
+        descriptor.put("description", modMetadata.description);
+        return descriptor;
     }
 }

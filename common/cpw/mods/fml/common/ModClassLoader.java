@@ -18,6 +18,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 
 import net.minecraft.launchwrapper.IClassTransformer;
@@ -27,6 +28,8 @@ import com.google.common.collect.ImmutableList;
 
 import cpw.mods.fml.common.asm.ASMTransformer;
 import cpw.mods.fml.common.asm.transformers.AccessTransformer;
+import cpw.mods.fml.common.asm.transformers.ModAPITransformer;
+import cpw.mods.fml.common.discovery.ASMDataTable;
 import cpw.mods.fml.common.modloader.BaseModProxy;
 
 /**
@@ -99,5 +102,19 @@ public class ModClassLoader extends URLClassLoader
         }
         accessTransformer.ensurePublicAccessFor(modClazzName);
         return (Class<? extends BaseModProxy>) Class.forName(modClazzName, true, this);
+    }
+
+    public void clearNegativeCacheFor(Set<String> classList)
+    {
+        mainClassLoader.clearNegativeEntries(classList);
+    }
+
+    public ModAPITransformer addModAPITransformer(ASMDataTable dataTable)
+    {
+        mainClassLoader.registerTransformer("cpw.mods.fml.common.asm.transformers.ModAPITransformer");
+        List<IClassTransformer> transformers = mainClassLoader.getTransformers();
+        ModAPITransformer modAPI = (ModAPITransformer) transformers.get(transformers.size()-1);
+        modAPI.initTable(dataTable);
+        return modAPI;
     }
 }
