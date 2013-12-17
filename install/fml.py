@@ -1184,7 +1184,7 @@ def download_libraries(mcp_dir, libraries, natives_dir):
                 failed = True
             else:
                 md5 = None
-                if 'ETag' in headers.keys(): # Amazon headers, Mojang's server
+                if 'X-Amz-Cf-Id' in headers.keys(): # Amazon headers, Mojang's server
                     md5 = headers['ETag']
                 else: # Could be a normal maven repo, check for .md5 file
                     try:
