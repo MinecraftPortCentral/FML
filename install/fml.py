@@ -8,6 +8,7 @@ from pprint import pprint
 from zipfile import ZipFile
 from pprint import pprint
 from contextlib import closing
+from urllib2 import HTTPError
 
 #==========================================================================
 #                      Utility Functions
@@ -1178,31 +1179,42 @@ def download_libraries(mcp_dir, libraries, natives_dir):
         for file_name in file_names:
             url = '%s/%s/%s' % (root_url, '/'.join(path), file_name)
             file_path = os.path.join(lib_dir, os.sep.join(path), file_name)
-            headers = get_headers(url)
-            if headers is None:
-                print('Could not retreive headers for library: %s ( %s )' % (lib['name'], url))
-                failed = True
-            else:
-                md5 = None
-                if 'ETag' in headers.keys(): # Amazon headers, Mojang's server
-                    md5 = headers['ETag']
-                else: # Could be a normal maven repo, check for .md5 file
-                    try:
-                        md5 = urllib2.urlopen(url + '.md5').read().split(' ')[0].replace('\r', '').replace('\n', '')
-                        if not len(md5) == 32:
+
+            # First attempt to download the file plus ".md5". Maven-like repositories use these files.
+            md5 = None
+            try:
+                md5 = urllib2.urlopen(url + '.md5').read().split(' ')[0].replace('\r', '').replace('\n', '')
+                if len(md5) != 32:
+                    md5 = None
+            except HTTPError:
+                pass
+
+            # If the MD5 file could not be downloaded, then fetch the ETag and check if it is 32 long, because then it might be file's MD5 hash
+            # Amazon S3, where Mojang store their resource files, use this.
+            if md5 == None:
+                headers = None
+                try:
+                    headers = get_headers(url)
+                except HTTPError:
+                    pass
+
+                if headers != None:
+                    if 'ETag' in headers.keys(): # Amazon headers, Mojang's server
+                        md5 = headers['ETag']
+                        if len(md5) != 32:
                             md5 = None
-                            print('Could not retrieve md5 for library %s ( %s.md5 )' % (file_name, url))
-                            failed = True
-                    except (HTTPError):
-                        failed = True
-                        pass
-                downloads.append({
-                    'url' : url,
-                    'file' : file_path,
-                    'md5'  : md5,
-                    'size' : headers['Content-Length'],
-                    'extract' : extract
-                })
+
+            if md5 == None:
+                print('Could not retreive headers for library: %s' % (lib['name']))
+                failed = True
+
+            downloads.append({
+                'url' : url,
+                'file' : file_path,
+                'md5'  : md5,
+                'size' : headers['Content-Length'],
+                'extract' : extract
+            })
     
     return download_list(downloads, natives_dir) or failed
     
